@@ -1,6 +1,8 @@
 import json
 from enum import Enum, auto, verify, CONTINUOUS
 
+from flask import session
+
 class ROAPMessageType(Enum):
     Offer = 'OFFER'
     Answer = 'ANSWER'
@@ -19,8 +21,8 @@ class ROAPMessageErrorType(Enum):
 @verify(CONTINUOUS)
 class ROAPSessionStateType(Enum):
     Setup = 1
-    WaitForClose = 4
-    Closed = 5
+    WaitForClose = 2
+    Closed = 3
 
 class ROAPSession():
     def __init__(self, offer, answer, sid):
@@ -77,7 +79,14 @@ class ROAPSessionsManager():
         del self.allSessions[answer]
 
     def deleteSession(self, sid):
-        for s in self.allSessions.values:
+        for s in self.allSessions.values():
             if s.socketioSid == sid:
                 self.deleteOfferAndAnswer(s.offererSessionId, 
                 s.answererSessionId)
+
+def getROAPSessions():
+    if session.get('ROAPSessions') == None:
+        session['ROAPSessions'] = ROAPSessionsManager()
+        return session['ROAPSessions']
+    else:
+        return session['ROAPSessions']

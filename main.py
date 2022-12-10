@@ -1,5 +1,5 @@
 import json
-from roaprotocol import ROAPMessageType, ROAPMessageErrorType, ROAPSession, ROAPSessionsManager
+from roaprotocol import ROAPMessageType, ROAPMessageErrorType, ROAPSession, ROAPSessionsManager, getROAPSessions
 
 from flask import Flask, session, request 
 from flask_sock import Sock
@@ -9,9 +9,8 @@ from flask_mqtt import Mqtt, MQTT_LOG_ERR
 
 app = Flask(__name__)
 app.config.from_file("Configure.json", load=json.load)
-session["ROAPSessions"] = ROAPSessionsManager()
 
-sock = Sock(app)
+# sock = Sock(app)
 socketio = SocketIO(app, cors_allowed_origins ="*")
 mqtt = Mqtt(app)
 
@@ -64,8 +63,8 @@ def handle_json(packet):
             'message': 'except a offer'
             }:
             join_room('waiting_room')
-            
-            mqtt.publish("webrtc/reguestmedia/camera", json.dumps(packet, indent=4)) 
+            print("Event:" + str(request.event))
+            mqtt.publish("webrtc/requestmedia/camera", json.dumps(packet, indent=4)) 
 
 @socketio.on('ROAP', namespace='/webrtc')
 def handle_json(packet):
@@ -76,11 +75,14 @@ def handle_json(packet):
             'answererSessionId': answererSessionId,
             'seq': seq
             }:
-            if session["ROAPSessions"].isHaveOffer(offererSessionId):
-                if seq == 1 and packet["messageType"] == ROAPMessageType.Answer:
+            if getROAPSessions().isHaveOffer(offererSessionId):
+                if packet["messageType"] == ROAPMessageType.Ok and s.isWaitClose():
+                    getROAPSessions().deleteOfferAndAnswer(offererSessionId, answererSessionId)
+                    leave_room('living_room')
+                elif seq == 1 and packet["messageType"] == ROAPMessageType.Answer:
                     currentSession = ROAPSession(offererSessionId, answererSessionId, request.sid)
-                    session["ROAPSessions"].addAnswer(answererSessionId, currentSession)
-                    leave_room('waiting_room ')
+                    getROAPSessions().addAnswer(answererSessionId, currentSession)
+                    leave_room('waiting_room')
                     join_room('living_room')
                 mqtt.publish("webrtc/roap/camera", json.dumps(packet, indent=4)) 
             else:
@@ -106,6 +108,7 @@ def handle_connect(auth):
 
 @socketio.on('disconnect', namespace='/webrtc')
 def handle_disconnect():
+    getROAPSessions().deleteSession(request.sid)
     print('Client disconnected')
 # ---------MQTT----------
 @mqtt.on_log()
@@ -135,11 +138,11 @@ def handle_message(client, userdata, message):
             'answererSessionId': answererSessionId,
             'seq': seq
             }:
-            if session["ROAPSessions"].isHaveAnswer(answererSessionId):
-                s = session["ROAPSessions"].getAnswerSession(answererSessionId)
+            if getROAPSessions().isHaveAnswer(answererSessionId):
+                s = getROAPSessions().getAnswerSession(answererSessionId)
                 if s.isWaitClose():
-                    session["ROAPSessions"].deleteOfferAndAnswer()
-                if packet['messageType'] == ROAPMessageType.Shutdown:
+                    getROAPSessions().deleteOfferAndAnswer(offererSessionId, answererSessionId)
+                elif packet['messageType'] == ROAPMessageType.Shutdown:
                     s.setStateWaitClose()
                 emit('ROAP', packet, to=sid)
             else:
