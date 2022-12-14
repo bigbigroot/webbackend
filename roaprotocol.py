@@ -1,55 +1,58 @@
-import json
-from enum import Enum, auto, verify, CONTINUOUS
+from enum import Enum, verify, CONTINUOUS
 
-from flask import session
 
 class ROAPMessageType(Enum):
-    Offer = 'OFFER'
-    Answer = 'ANSWER'
-    Ok = 'OK'
-    Error = 'ERROR'
-    Shutdown = 'SHUTDOWN'
+    OFFER = 'OFFER'
+    ANSWER = 'ANSWER'
+    OK = 'OK'
+    ERROR = 'ERROR'
+    SHUTDOWN = 'SHUTDOWN'
+
 
 class ROAPMessageErrorType(Enum):
-    NoMatch = 'NOMATCH'
-    Timeout = 'TIMEOUT'
-    Refused = 'REFUSED'
-    Conflict = 'CONFLICT'
-    DoubleConflict = "DOUBLECONFLICT"
-    Failed = 'FAILED'
+    NOMATCH = 'NOMATCH'
+    TIMEOUT = 'TIMEOUT'
+    REFUSED = 'REFUSED'
+    CONFLICT = 'CONFLICT'
+    DOUBLECONFLICT = "DOUBLECONFLICT"
+    FAILED = 'FAILED'
+
 
 @verify(CONTINUOUS)
 class ROAPSessionStateType(Enum):
-    Setup = 1
-    WaitForClose = 2
-    Closed = 3
+    SETUP = 1
+    WAITFORCLOSE = 2
+    CLOSED = 3
 
-class ROAPSession():
+
+class ROAPSession(object):
     def __init__(self, offer, answer, sid):
-        self.state = ROAPSessionStateType.Setup
+        self.state = ROAPSessionStateType.SETUP
         self.offererSessionId = offer
         self.answererSessionId = answer
         self.socketioSid = sid
-    def setStateWaitClose(self):
-        self.state = ROAPSessionStateType.WaitForClose
-    
-    def isWaitClose(self):
-        return self.state == ROAPSessionStateType.WaitForClose
 
-class ROAPSessionsManager():
+    def set_state_as_wait_close(self):
+        self.state = ROAPSessionStateType.WAITFORCLOSE
+
+    def is_wait_for_close(self):
+        return self.state == ROAPSessionStateType.WAITFORCLOSE
+
+
+class ROAPSessionsManager(object):
     def __init__(self):
-        self.allSessions : dict
-        self.allOffererSessionIds : set
-        self.allAnswererSessionIds : set
+        self.allSessions = dict()
+        self.allOffererSessionIds = set()
+        self.allAnswererSessionIds = set()
 
-    def addOffer(self, offer):
+    def add_offer(self, offer):
         if offer in self.allOffererSessionIds:
             return False
         else:
             self.allOffererSessionIds.add(offer)
             return True
 
-    def addAnswer(self, answer, session):
+    def add_answer(self, answer, session):
         if answer in self.allAnswererSessionIds:
             return False
         else:
@@ -57,36 +60,30 @@ class ROAPSessionsManager():
             self.allSessions[answer] = session
             return True
 
-    def getAnswerSession(self, answer):
-        return allSessions[answer]
+    def get_session_of_answer(self, answer):
+        return self.allSessions[answer]
 
-    def isHaveOffer(self, offer):
+    def is_have_offer(self, offer):
         return offer in self.allOffererSessionIds
 
-    def isHaveAnswer(self, answer):
+    def is_have_answer(self, answer):
         return answer in self.allAnswererSessionIds
-    
-    def deleteOffer(self, offer):
+
+    def delete_offer(self, offer):
         self.allOffererSessionIds.remove(offer)
 
-    def deleteAnswer(self, answer):
+    def delete_answer(self, answer):
         self.allAnswererSessionIds.remove(answer)
         del self.allSessions[answer]
 
-    def deleteOfferAndAnswer(self, offer, answer):
+    def delete_offer_and_answer(self, offer, answer):
         self.allOffererSessionIds.remove(offer)
         self.allAnswererSessionIds.remove(answer)
         del self.allSessions[answer]
 
-    def deleteSession(self, sid):
+    def delete_session(self, sid):
         for s in self.allSessions.values():
             if s.socketioSid == sid:
-                self.deleteOfferAndAnswer(s.offererSessionId, 
-                s.answererSessionId)
-
-def getROAPSessions():
-    if session.get('ROAPSessions') == None:
-        session['ROAPSessions'] = ROAPSessionsManager()
-        return session['ROAPSessions']
-    else:
-        return session['ROAPSessions']
+                self.delete_offer_and_answer(
+                    s.offererSessionId,
+                    s.answererSessionId)

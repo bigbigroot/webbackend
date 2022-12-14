@@ -1,4 +1,6 @@
 {
+    "SECRET_KEY": "APP",
+    "TEMPLATES_AUTO_RELOAD": true,
     "SOCK_SERVER_OPTIONS":
     {
         "ping_interval": 25
