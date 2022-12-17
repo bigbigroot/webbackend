@@ -1,5 +1,7 @@
 from enum import Enum, verify, CONTINUOUS
 
+from flask import session
+
 
 class ROAPMessageType(Enum):
     OFFER = 'OFFER'
@@ -26,9 +28,13 @@ class ROAPSessionStateType(Enum):
 
 
 class ROAPSession(object):
-    def __init__(self, offer, answer, sid):
+    def __init__(self):
         self.state = ROAPSessionStateType.SETUP
+
+    def set_offer(self, offer):
         self.offererSessionId = offer
+
+    def set_answer(self, answer, sid):
         self.answererSessionId = answer
         self.socketioSid = sid
 
@@ -49,19 +55,23 @@ class ROAPSessionsManager(object):
         if offer in self.allOffererSessionIds:
             return False
         else:
+            s = ROAPSession()
+            s.set_offer(offer)
             self.allOffererSessionIds.add(offer)
+            self.allSessions[offer] = s
             return True
 
-    def add_answer(self, answer, session):
+    def add_answer(self, offer, answer, sid):
         if answer in self.allAnswererSessionIds:
             return False
         else:
+            s = self.allSessions[offer]
+            s.set_answer(answer, sid)
             self.allAnswererSessionIds.add(answer)
-            self.allSessions[answer] = session
             return True
 
-    def get_session_of_answer(self, answer):
-        return self.allSessions[answer]
+    def get_session_of_offer(self, offer):
+        return self.allSessions[offer]
 
     def is_have_offer(self, offer):
         return offer in self.allOffererSessionIds
@@ -71,15 +81,15 @@ class ROAPSessionsManager(object):
 
     def delete_offer(self, offer):
         self.allOffererSessionIds.remove(offer)
+        del self.allSessions[offer]
 
     def delete_answer(self, answer):
         self.allAnswererSessionIds.remove(answer)
-        del self.allSessions[answer]
 
     def delete_offer_and_answer(self, offer, answer):
         self.allOffererSessionIds.remove(offer)
         self.allAnswererSessionIds.remove(answer)
-        del self.allSessions[answer]
+        del self.allSessions[offer]
 
     def delete_session(self, sid):
         for s in self.allSessions.values():

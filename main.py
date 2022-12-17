@@ -9,7 +9,7 @@ from flask import Flask, json, request
 from flask_mqtt import Mqtt
 from flask_socketio import (
     SocketIO,
-    send,
+    emit,
     join_room,
     leave_room
 )
@@ -31,7 +31,7 @@ def hello_world():
 # ---------Socket IO----------
 
 
-@socketio.on('ready', namespace='/webrtc')
+@socketio.on('call_offer', namespace='/webrtc')
 def handle_json():
     packet = {'cmd': 'AWAIT-OFFER'}
     join_room('waiting_room')
@@ -41,21 +41,21 @@ def handle_json():
     )
 
 
-@socketio.on('setup', namespace='/webrtc')
+@socketio.on('to_offer', namespace='/webrtc')
 def handle_message(packet):
     match packet:
         case {
-            'messageType': ROAPMessageType.ANSWER |
-            ROAPMessageType.OK |
-            ROAPMessageType.ERROR |
-            ROAPMessageType.SHUTDOWN,
+            'messageType': ROAPMessageType.ANSWER.value |
+            ROAPMessageType.OK.value |
+            ROAPMessageType.ERROR.value |
+            ROAPMessageType.SHUTDOWN.value,
             'offererSessionId': offererSessionId,
             'answererSessionId': answererSessionId,
             'seq': seq
         }:
             if all_active_roap_sesions.is_have_offer(offererSessionId):
-                s = all_active_roap_sesions.get_session_of_answer(
-                    answererSessionId)
+                s = all_active_roap_sesions.get_session_of_offer(
+                    offererSessionId)
                 if (packet["messageType"] == ROAPMessageType.OK and
                         s.is_wait_for_close()):
                     all_active_roap_sesions.delete_offer_and_answer(
@@ -65,14 +65,10 @@ def handle_message(packet):
                     leave_room('living_room')
                 elif (seq == 1 and
                         packet["messageType"] == ROAPMessageType.ANSWER):
-                    currentSession = ROAPSession(
+                    all_active_roap_sesions.add_answer(
                         offererSessionId,
                         answererSessionId,
-                        request.sid
-                    )
-                    all_active_roap_sesions.add_answer(
-                        answererSessionId,
-                        currentSession)
+                        request.sid)
                     leave_room('waiting_room')
                     join_room('living_room')
                 mqtt.publish(
@@ -86,13 +82,11 @@ def handle_message(packet):
                     'answererSessionId': answererSessionId,
                     'seq': seq
                 }
-                send(json.dumps(error_msg, indent=4))
+                emit(
+                    'to_answer', error_msg,
+                    to=request.sid, namespace='/webrtc')
         case _:
-            error_msg = {
-                'messageType': ROAPMessageType.ERROR,
-                'errorType': ROAPMessageErrorType.FAILED
-            }
-            send(json.dumps(error_msg, indent=4))
+            print("unaccept formate of ROAP Message from answer")
 
 
 @socketio.on('connect', namespace='/webrtc')
@@ -119,7 +113,7 @@ def handle_mqtt_connect(client, userdata, flags, rc):
 
 
 @mqtt.on_disconnect()
-def handle_mqtt_disconnect(client, userdata, flags, rc):
+def handle_mqtt_disconnect(client):
     print('try to reconnect')
     mqtt.client.reconnect()
 
@@ -135,10 +129,9 @@ def handle_mqtt_message(client, userdata, message):
             'seq': seq
         } if seq == 1:
             all_active_roap_sesions.add_offer(offererSessionId)
-            with app.app_context():
-                socketio.emit(
-                    'to_answer', packet,
-                    to='waiting_room', namespace='/webrtc')
+            socketio.emit(
+                'to_answer', packet,
+                to='waiting_room', namespace='/webrtc')
         case {
             'messageType': ROAPMessageType.OFFER.value |
             ROAPMessageType.OK.value |
@@ -149,14 +142,14 @@ def handle_mqtt_message(client, userdata, message):
             'seq': seq
         }:
             if all_active_roap_sesions.is_have_answer(answererSessionId):
-                s = all_active_roap_sesions.get_session_of_answer(
-                    answererSessionId)
+                s = all_active_roap_sesions.get_session_of_offer(
+                    offererSessionId)
                 if s.isWaitClose():
                     all_active_roap_sesions.delete_offer_and_answer(
                         offererSessionId, answererSessionId)
                 elif packet['messageType'] == ROAPMessageType.SHUTDOWN:
                     s.setStateWaitClose()
-                socketio.emit('setup', packet, to=s.socketioSid)
+                socketio.emit('to_answer', packet, to=s.socketioSid)
             else:
                 error_msg = {
                     'messageType': ROAPMessageType.ERROR.value,
@@ -169,13 +162,7 @@ def handle_mqtt_message(client, userdata, message):
                     'webrtc/roap/camera',
                     json.dumps(error_msg, indent=4).encode('utf-8'))
         case _:
-            error_msg = {
-                'messageType': ROAPMessageType.ERROR.value,
-                'errorType': ROAPMessageErrorType.FAILED.value,
-            }
-            mqtt.publish(
-                'webrtc/roap/camera',
-                json.dumps(error_msg, indent=4).encode('utf-8'))
+            print("unaccept formate of ROAP Message from offer")
 
 
 if __name__ == '__main__':
