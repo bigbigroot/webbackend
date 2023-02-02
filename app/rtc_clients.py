@@ -1,8 +1,7 @@
 import multiprocessing
-from enum import Enum, verify, CONTINUOUS
+from enum import Enum
 
 
-@verify(CONTINUOUS)
 class ROAPSessionStateType(Enum):
     SETUP = 1
     WAITFORCLOSE = 2
