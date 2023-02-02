@@ -11,5 +11,9 @@ setup(
     packages=['webbackend'],
     include_package_data=True,
     zip_safe=False,
-    install_requires=required
+    install_requires=[
+        'Flask==2.2.2',
+        'Flask-MQTT==1.1.1',
+        'Flask-SocketIO==5.3.2'
+    ]
 )
