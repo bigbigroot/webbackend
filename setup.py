@@ -5,7 +5,7 @@ setup(
     name='webbackend',
     version='1.0',
     long_description=__doc__,
-    packages=['webbackend'],
+    packages=['app'],
     include_package_data=True,
     zip_safe=False,
     install_requires=[
