@@ -1,0 +1,8 @@
+TEMPLATES_AUTO_RELOAD = True
+SOCK_SERVER_OPTIONS = {
+    "ping_interval": 25
+}
+MQTT_BROKER_URL = "raspberrypi.local"
+MQTT_BROKER_PORT = 1883
+MQTT_USERNAME = "test"
+MQTT_PASSWORD = "test"

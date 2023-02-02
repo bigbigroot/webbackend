@@ -1,35 +1,31 @@
 import time
-from medianclients import (
+from . import create_app, socketio, mqtt
+from .roappacket import (
     ROAPMessageType,
     ROAPMessageErrorType,
-    ROAPSessionsManager
 )
+from .rtc_clients import ROAPSessionsManager
 
 import multiprocessing
-from flask import Flask, json, request
-from flask_mqtt import Mqtt
+from flask import json, request
+from flask_mqtt import MQTT_ERR_SUCCESS
 from flask_socketio import (
-    SocketIO,
     emit,
     join_room,
     leave_room
 )
 
+from app import roappacket
+
 globalDataManager = multiprocessing.Manager()
 all_active_roap_sesions = ROAPSessionsManager()
 waitClientsSid = globalDataManager.dict()
 
-app = Flask(__name__)
-app.config.from_file("Configure.json", load=json.load)
+app = create_app()
 
-socketio = SocketIO(app, logger=True, engineio_logger=True,
-                    cors_allowed_origins="*")
-mqtt = Mqtt(app)
-
-
-@app.post("/api/authenticate")
-def authenticator():
-    return "ok"
+# socketio = SocketIO(app, logger=True, engineio_logger=True,
+#                     cors_allowed_origins="*")
+# mqtt = Mqtt(app)
 
 
 # ---------Socket IO----------
@@ -46,49 +42,43 @@ def handle_json():
 @socketio.on('to_offer', namespace='/webrtc')
 def handle_message(message):
     packet = json.loads(message)
-    match packet:
-        case {
-            'messageType': ROAPMessageType.ANSWER.value |
-            ROAPMessageType.OK.value |
-            ROAPMessageType.ERROR.value |
-            ROAPMessageType.SHUTDOWN.value,
-            'offererSessionId': offererSessionId,
-            'answererSessionId': answererSessionId,
-            'seq': seq
-        }:
-            if all_active_roap_sesions.is_have_offer(offererSessionId):
-                s = all_active_roap_sesions.get_session_of_offer(
-                    offererSessionId)
-                if (packet["messageType"] == ROAPMessageType.OK and
-                        s.is_wait_for_close()):
-                    all_active_roap_sesions.delete_offer_and_answer(
-                        offererSessionId,
-                        answererSessionId
-                    )
-                    leave_room('living_room')
-                elif (seq == 1 and
-                        packet["messageType"] == ROAPMessageType.ANSWER):
-                    all_active_roap_sesions.add_answer(
-                        offererSessionId,
-                        answererSessionId,
-                        request.sid)
-                    join_room('living_room')
-                mqtt.publish(
-                    "webrtc/roap/camera",
-                    json.dumps(packet, indent=4).encode('utf-8'))
-            else:
-                error_msg = {
-                    'messageType': ROAPMessageType.ERROR.value,
-                    'errorType': ROAPMessageErrorType.NOMATCH.value,
-                    'offererSessionId': offererSessionId,
-                    'answererSessionId': answererSessionId,
-                    'seq': seq
-                }
-                emit(
-                    'to_answer', json.dumps(error_msg, indent=4),
-                    to=request.sid, namespace='/webrtc')
-        case _:
-            app.logger.warning("unaccept formate of ROAP Message from answer")
+    if (roappacket.check_packet_format(packet)):
+        offererSessionId = packet['offererSessionId']
+        answererSessionId = packet['answererSessionId']
+        seq = packet['seq']
+        if all_active_roap_sesions.is_have_offer(offererSessionId):
+            s = all_active_roap_sesions.get_session_of_offer(
+                offererSessionId)
+            if (packet["messageType"] == ROAPMessageType.OK and
+                    s.is_wait_for_close()):
+                all_active_roap_sesions.delete_offer_and_answer(
+                    offererSessionId,
+                    answererSessionId
+                )
+                leave_room('living_room')
+            elif (seq == 1 and
+                    packet["messageType"] == ROAPMessageType.ANSWER):
+                all_active_roap_sesions.add_answer(
+                    offererSessionId,
+                    answererSessionId,
+                    request.sid)
+                join_room('living_room')
+            mqtt.publish(
+                "webrtc/roap/camera",
+                json.dumps(packet, indent=4).encode('utf-8'))
+        else:
+            error_msg = {
+                'messageType': ROAPMessageType.ERROR.value,
+                'errorType': ROAPMessageErrorType.NOMATCH.value,
+                'offererSessionId': offererSessionId,
+                'answererSessionId': answererSessionId,
+                'seq': seq
+            }
+            emit(
+                'to_answer', json.dumps(error_msg, indent=4),
+                to=request.sid, namespace='/webrtc')
+    else:
+        app.logger.warning("unaccept formate of ROAP Message from answer")
 
 
 @socketio.on('connect', namespace='/webrtc')
@@ -110,17 +100,22 @@ def handle_disconnect():
 # ---------MQTT----------
 @mqtt.on_log()
 def handle_logging(client, userdata, level, buf):
-    print('MQTT {0}: {1}'.format(level, buf))
+    app.logger.debug('MQTT {0}: {1}'.format(level, buf))
 
 
 @mqtt.on_connect()
 def handle_mqtt_connect(client, userdata, flags, rc):
-    mqtt.subscribe('webrtc/roap/app')
+    app.logger.info('MQTT is connected to the broker.')
+    (res, mid) = mqtt.subscribe('webrtc/roap/app')
+    if res == MQTT_ERR_SUCCESS:
+        app.logger.info("subscribe Topic sucess.")
+    else:
+        app.logger.error("subscribe Topic not sucess!")
 
 
 @mqtt.on_disconnect()
 def handle_mqtt_disconnect():
-    app.logger.error('MQTT lost connect')
+    app.logger.error('MQTT lost connect.')
     # mqtt.client.reconnect()
 
 
@@ -128,12 +123,10 @@ def handle_mqtt_disconnect():
 def handle_mqtt_message(client, userdata, message):
     msgStr = message.payload.decode()
     packet = json.loads(msgStr)
-    match packet:
-        case {
-            'messageType': ROAPMessageType.OFFER.value,
-            'offererSessionId': offererSessionId,
-            'seq': seq
-        } if seq == 1:
+    if roappacket.check_packet_format(packet):
+        offererSessionId = packet['offererSessionId']
+        seq = packet['seq']
+        if seq == 1:
             all_active_roap_sesions.add_offer(offererSessionId)
             while len(waitClientsSid) > 0:
                 [sid, createTime] = waitClientsSid.popitem()
@@ -143,8 +136,8 @@ def handle_mqtt_message(client, userdata, message):
                         to=sid, namespace='/webrtc')
                     break
 
-            # else:
-            #     print("offer have been sent more than once.")
+            else:
+                app.logger.warning("have not a active client.")
             #     error_msg = {
             #         'messageType': ROAPMessageType.ERROR.value,
             #         'errorType': ROAPMessageErrorType.FAILED.value,
@@ -155,15 +148,8 @@ def handle_mqtt_message(client, userdata, message):
             #         'webrtc/roap/camera',
             #         json.dumps(error_msg, indent=4).encode('utf-8'))
 
-        case {
-            'messageType': ROAPMessageType.OFFER.value |
-            ROAPMessageType.OK.value |
-            ROAPMessageType.ERROR.value |
-            ROAPMessageType.SHUTDOWN.value,
-            'offererSessionId': offererSessionId,
-            'answererSessionId': answererSessionId,
-            'seq': seq
-        }:
+        else:
+            answererSessionId = packet['answererSessionId']
             if all_active_roap_sesions.is_have_answer(answererSessionId):
                 s = all_active_roap_sesions.get_session_of_offer(
                     offererSessionId)
@@ -184,8 +170,8 @@ def handle_mqtt_message(client, userdata, message):
                 mqtt.publish(
                     'webrtc/roap/camera',
                     json.dumps(error_msg, indent=4).encode('utf-8'))
-        case _:
-            app.logger.warning("unaccept formate of ROAP Message from offer")
+    else:
+        app.logger.warning("unaccept formate of ROAP Message from offer")
 
 
 if __name__ == '__main__':

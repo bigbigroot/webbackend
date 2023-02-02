@@ -1,22 +1,5 @@
-from enum import Enum, verify, CONTINUOUS
 import multiprocessing
-
-
-class ROAPMessageType(Enum):
-    OFFER = 'OFFER'
-    ANSWER = 'ANSWER'
-    OK = 'OK'
-    ERROR = 'ERROR'
-    SHUTDOWN = 'SHUTDOWN'
-
-
-class ROAPMessageErrorType(Enum):
-    NOMATCH = 'NOMATCH'
-    TIMEOUT = 'TIMEOUT'
-    REFUSED = 'REFUSED'
-    CONFLICT = 'CONFLICT'
-    DOUBLECONFLICT = "DOUBLECONFLICT"
-    FAILED = 'FAILED'
+from enum import Enum, verify, CONTINUOUS
 
 
 @verify(CONTINUOUS)

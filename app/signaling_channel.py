@@ -1,35 +1,26 @@
 import time
-from medianclients import (
+
+from .rtc_clients import (
     ROAPMessageType,
     ROAPMessageErrorType,
     ROAPSessionsManager
 )
+from . import mqtt, socketio
+
 
 import multiprocessing
-from flask import Flask, json, request
-from flask_mqtt import Mqtt
+from flask import json, request, current_app
 from flask_socketio import (
-    SocketIO,
     emit,
     join_room,
     leave_room
 )
 
+app = current_app
+
 globalDataManager = multiprocessing.Manager()
 all_active_roap_sesions = ROAPSessionsManager()
 waitClientsSid = globalDataManager.dict()
-
-app = Flask(__name__)
-app.config.from_file("Configure.json", load=json.load)
-
-socketio = SocketIO(app, logger=True, engineio_logger=True,
-                    cors_allowed_origins="*")
-mqtt = Mqtt(app)
-
-
-@app.post("/api/authenticate")
-def authenticator():
-    return "ok"
 
 
 # ---------Socket IO----------
@@ -108,20 +99,6 @@ def handle_disconnect():
 
 
 # ---------MQTT----------
-@mqtt.on_log()
-def handle_logging(client, userdata, level, buf):
-    print('MQTT {0}: {1}'.format(level, buf))
-
-
-@mqtt.on_connect()
-def handle_mqtt_connect(client, userdata, flags, rc):
-    mqtt.subscribe('webrtc/roap/app')
-
-
-@mqtt.on_disconnect()
-def handle_mqtt_disconnect():
-    app.logger.error('MQTT lost connect')
-    # mqtt.client.reconnect()
 
 
 @mqtt.on_topic('webrtc/roap/app')
@@ -186,7 +163,3 @@ def handle_mqtt_message(client, userdata, message):
                     json.dumps(error_msg, indent=4).encode('utf-8'))
         case _:
             app.logger.warning("unaccept formate of ROAP Message from offer")
-
-
-if __name__ == '__main__':
-    socketio.run(app, host='0.0.0.0', use_reloader=False, debug=True)
