@@ -2,3 +2,5 @@ venv
 .vscode
 __pycache__
 app/__pycache__
+build
+webbackend.egg-info

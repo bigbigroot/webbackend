@@ -12,6 +12,7 @@ setup(
         'Flask==2.2.2',
         'Flask-MQTT==1.1.1',
         'Flask-SocketIO==5.3.2',
-        'gevent==22.10.2'
+        'gevent==22.10.2',
+        'gunicorn==20.1.0'
     ]
 )
