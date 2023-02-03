@@ -63,9 +63,11 @@ def on_call_offer():
 
 @socketio.on('to_offer', namespace='/webrtc')
 def handle_message(message):
-    back_to_offer(request.sid, message)
+    with app.app_context():
+        back_to_offer(request.sid, message)
 
 
 @mqtt.on_topic('webrtc/roap/app')
 def on_to_answer(client, userdata, message):
-    to_answer(message.payload.decode())
+    with app.app_context():
+        to_answer(message.payload.decode())
