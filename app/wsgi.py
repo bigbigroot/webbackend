@@ -1,9 +1,9 @@
 from flask import request
-from app import create_app, socketio, mqtt
+from . import create_app, socketio, mqtt
 
 from flask_mqtt import MQTT_ERR_SUCCESS
 
-from app.signaling_channel import (
+from .signaling_channel import (
     back_to_offer,
     call_offer,
     close_client,
