@@ -27,8 +27,11 @@ def create_app(test_config=None):
     except OSError:
         pass
 
-    socketio.init_app(app, logger=True, engineio_logger=True,
+    socketio.init_app(app, async_mode="gevent",
+                      logger=True,
+                      engineio_logger=True,
                       cors_allowed_origins="*")
+
     mqtt.init_app(app)
 
     @app.route('/hello')
