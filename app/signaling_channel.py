@@ -9,7 +9,7 @@ from .rtc_clients import ROAPSessionsManager
 from . import mqtt, socketio
 
 
-import multiprocessing
+# import multiprocessing
 from flask import json, current_app
 from flask_socketio import (
     emit,
@@ -18,9 +18,9 @@ from flask_socketio import (
 )
 
 
-globalDataManager = multiprocessing.Manager()
+# globalDataManager = multiprocessing.Manager()
 all_active_roap_sesions = ROAPSessionsManager()
-waitClientsSid = globalDataManager.dict()
+waitClientsSid = dict()
 
 
 def close_client(sid: str):
