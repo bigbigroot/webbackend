@@ -1,13 +1,14 @@
 from flask import request
-from . import create_app, socketio, mqtt
+from app import create_app, socketio, mqtt
 
 from flask_mqtt import MQTT_ERR_SUCCESS
 
-from .signaling_channel import (
+from app.signaling_channel import (
     back_to_offer,
     call_offer,
     close_client,
-    to_answer)
+    to_answer
+)
 
 app = create_app()
 
@@ -68,7 +69,3 @@ def handle_message(message):
 @mqtt.on_topic('webrtc/roap/app')
 def on_to_answer(client, userdata, message):
     to_answer(message.payload.decode())
-
-
-if __name__ == '__main__':
-    socketio.run(app, host='0.0.0.0', use_reloader=False, debug=True)
