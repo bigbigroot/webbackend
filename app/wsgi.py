@@ -69,7 +69,3 @@ def handle_message(message):
 @mqtt.on_topic('webrtc/roap/app')
 def on_to_answer(client, userdata, message):
     to_answer(message.payload.decode())
-
-
-if __name__ == '__main__':
-    socketio.run(app, host='0.0.0.0', use_reloader=False, debug=True)
