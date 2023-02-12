@@ -1,13 +1,16 @@
 from flask import request
-from . import create_app, socketio, mqtt
-
+from flask_socketio import disconnect
 from flask_mqtt import MQTT_ERR_SUCCESS
 
+from . import create_app, socketio, mqtt
 from .signaling_channel import (
     back_to_offer,
     call_offer,
     close_client,
-    to_answer)
+    to_answer
+)
+from .auth import authenticate_token
+
 
 app = create_app()
 
@@ -21,7 +24,8 @@ app = create_app()
 
 @socketio.on('connect', namespace='/webrtc')
 def handle_connect(auth):
-    pass
+    if not authenticate_token(auth['token']):
+        disconnect(namespace='/webrtc')
     # print("Client connect:" + str(auth) + str(request.sid) + str(session))
 
 

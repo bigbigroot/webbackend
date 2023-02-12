@@ -1,5 +1,4 @@
 import os
-
 from flask import Flask
 from flask_mqtt import Mqtt
 from flask_socketio import SocketIO
@@ -12,7 +11,7 @@ def create_app(test_config=None):
     # create and configure the app
     app = Flask(__name__, instance_relative_config=True)
     app.config.from_mapping(
-        SECRET_KEY='DEV'
+        SECRET_KEY='hXBfOwiQzmz2ap5ufeFRxEQbXwC8RVPP4jRyJE9xNPs'
     )
     if test_config is None:
         # load the instance config, if it exists, when not testing
@@ -34,9 +33,8 @@ def create_app(test_config=None):
 
     mqtt.init_app(app)
 
-    @app.route('/hello')
-    def hello():
-        return 'Hello, World!'
+    from . import db
+    db.init_app(app)
 
     from . import auth
     app.register_blueprint(auth.bp)
