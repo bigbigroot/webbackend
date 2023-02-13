@@ -26,7 +26,7 @@ def create_app(test_config=None):
     except OSError:
         pass
 
-    socketio.init_app(app, async_mode="gevent",
+    socketio.init_app(app, async_mode='gevent',
                       logger=True,
                       engineio_logger=True,
                       cors_allowed_origins="*")
@@ -38,5 +38,8 @@ def create_app(test_config=None):
 
     from . import auth
     app.register_blueprint(auth.bp)
+
+    from . import nm
+    app.register_blueprint(nm.bp)
 
     return app

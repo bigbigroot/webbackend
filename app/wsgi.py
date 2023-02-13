@@ -46,6 +46,7 @@ def handle_logging(client, userdata, level, buf):
 def handle_mqtt_connect(client, userdata, flags, rc):
     app.logger.info('MQTT is connected to the broker.')
     (res, mid) = mqtt.subscribe('webrtc/roap/app')
+    (res, mid) = mqtt.subscribe('networking/app')
     if res == MQTT_ERR_SUCCESS:
         app.logger.info("subscribe Topic sucess.")
     else:
